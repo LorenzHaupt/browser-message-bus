@@ -6,8 +6,13 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": []
+    "types": [],
+    "inlineSources": true
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests"]
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "tests"
+  ]
 }

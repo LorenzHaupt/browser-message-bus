@@ -1,5 +1,9 @@
 export interface BridgeTopicPolicy {
+  /** Public application topics allowed across this bridge. */
   readonly allowedTopics?: readonly string[];
+
+  /** Extension ids whose internal messages may cross this bridge. */
+  readonly allowedExtensions?: readonly string[];
 }
 
 export interface WindowBridgeBaseOptions extends BridgeTopicPolicy {

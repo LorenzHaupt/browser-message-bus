@@ -87,7 +87,6 @@ export interface ExtensionInstallation<TApi> {
   dispose?(): void | Promise<void>;
 }
 
-export interface ExtensionMessageContext extends MessageContext {}
 
 export interface ObservedMessage {
   readonly topic: string;

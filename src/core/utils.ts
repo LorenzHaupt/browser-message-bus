@@ -90,6 +90,10 @@ export function freezeIdentity(identity: BusIdentity): BusIdentity {
   return Object.freeze({ ...identity });
 }
 
+export function freezeTarget(target: MessageTarget | undefined): MessageTarget | undefined {
+  return target ? Object.freeze({ ...target }) : undefined;
+}
+
 export function toError(value: unknown): Error {
   return value instanceof Error ? value : new Error(String(value));
 }

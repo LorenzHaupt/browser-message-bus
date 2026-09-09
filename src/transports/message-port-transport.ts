@@ -27,16 +27,23 @@ export class MessagePortTransport implements BusTransport {
   private remoteClose: (() => void) | undefined;
   private isClosed = false;
   private readonly allowedTopics?: ReadonlySet<string>;
+  private readonly allowedExtensions?: ReadonlySet<string>;
+  private readonly hasExplicitPolicy: boolean;
 
   constructor(
     private readonly port: MessagePort,
     private readonly connectionId: string,
     allowedTopics: readonly string[] | undefined,
+    allowedExtensions: readonly string[] | undefined,
     private readonly reportError: MessageBusErrorHandler
   ) {
     this.id = `bridge:${connectionId}`;
+    this.hasExplicitPolicy = allowedTopics !== undefined || allowedExtensions !== undefined;
     if (allowedTopics) {
       this.allowedTopics = new Set(allowedTopics);
+    }
+    if (allowedExtensions) {
+      this.allowedExtensions = new Set(allowedExtensions);
     }
   }
 
@@ -139,10 +146,34 @@ export class MessagePortTransport implements BusTransport {
   };
 
   private isAllowed(envelope: BusEnvelope): boolean {
-    return envelope.system || !this.allowedTopics || this.allowedTopics.has(envelope.topic);
+    if (!this.hasExplicitPolicy) {
+      return true;
+    }
+
+    if (!envelope.system) {
+      return this.allowedTopics?.has(envelope.topic) ?? false;
+    }
+
+    const extensionId = extensionIdFromSystemTopic(envelope.topic);
+    return extensionId !== undefined && (this.allowedExtensions?.has(extensionId) ?? false);
   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function extensionIdFromSystemTopic(topic: string): string | undefined {
+  const prefix = "@bmb/ext/";
+  if (!topic.startsWith(prefix)) {
+    return undefined;
+  }
+
+  const rest = topic.slice(prefix.length);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) {
+    return undefined;
+  }
+
+  return rest.slice(0, slash);
 }

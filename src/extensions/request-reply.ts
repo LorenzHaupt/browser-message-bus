@@ -3,8 +3,10 @@ import {
   DuplicateRequestHandlerError,
   RemoteRequestError,
   RequestAbortedError,
-  RequestTimeoutError
+  RequestTimeoutError,
+  InvalidConfigurationError
 } from "../core/errors.js";
+import { createInstanceId } from "../core/utils.js";
 import type {
   MessageBusExtension,
   MessageContext,
@@ -17,7 +19,6 @@ export interface RequestDefinition {
   response: unknown;
 }
 
-export type RequestMap = object;
 export type ValidRequestMap<R extends object> = {
   [K in keyof R]: RequestDefinition;
 };
@@ -86,6 +87,7 @@ export function requestReply<R extends ValidRequestMap<R>>(
     id: "request-reply",
     install(context) {
       const defaultTimeoutMs = options.defaultTimeoutMs ?? 5_000;
+      assertTimeout(defaultTimeoutMs, "defaultTimeoutMs");
       const handlers = new Map<string, RequestHandler<unknown, unknown>>();
       const pending = new Map<string, PendingRequest>();
       let disposed = false;
@@ -102,6 +104,9 @@ export function requestReply<R extends ValidRequestMap<R>>(
 
         try {
           const response = await handler(value.payload, message);
+          if (disposed) {
+            return;
+          }
           const frame: ResponseFrame = {
             requestId: value.requestId,
             ok: true,
@@ -111,6 +116,9 @@ export function requestReply<R extends ValidRequestMap<R>>(
             target: { instanceId: message.source.instanceId }
           });
         } catch (error) {
+          if (disposed) {
+            return;
+          }
           const normalized = serializeError(error);
           const frame: ResponseFrame = {
             requestId: value.requestId,
@@ -154,7 +162,8 @@ export function requestReply<R extends ValidRequestMap<R>>(
           }
 
           const timeoutMs = requestOptions.timeoutMs ?? defaultTimeoutMs;
-          const requestId = randomId();
+          assertTimeout(timeoutMs, "timeoutMs");
+          const requestId = createInstanceId();
 
           return new Promise((resolve, reject) => {
             if (requestOptions.signal?.aborted) {
@@ -224,9 +233,6 @@ export function requestReply<R extends ValidRequestMap<R>>(
   };
 }
 
-function randomId(): string {
-  return crypto.randomUUID();
-}
 
 function serializeError(error: unknown): NonNullable<ResponseFrame["error"]> {
   if (error instanceof Error) {
@@ -259,4 +265,10 @@ function isResponseFrame(value: unknown): value is ResponseFrame {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function assertTimeout(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new InvalidConfigurationError(`${name} must be greater than zero.`);
+  }
 }

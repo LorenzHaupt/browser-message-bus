@@ -33,14 +33,31 @@ class WindowBridgeConnector implements BusConnector {
     const timeoutMs = this.options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     if (this.options.mode === "connect") {
-      return connectToWindow(localWindow, this.options.targetWindow, origin, timeoutMs, this.options.allowedTopics, context);
+      return connectToWindow(
+        localWindow,
+        this.options.targetWindow,
+        origin,
+        timeoutMs,
+        this.options.allowedTopics,
+        this.options.allowedExtensions,
+        context
+      );
     }
 
-    return acceptFromWindow(localWindow, this.options.targetWindow, origin, timeoutMs, this.options.allowedTopics, context);
+    return acceptFromWindow(
+      localWindow,
+      this.options.targetWindow,
+      origin,
+      timeoutMs,
+      this.options.allowedTopics,
+      this.options.allowedExtensions,
+      context
+    );
   }
 }
 
 export function windowBridge(options: WindowBridgeOptions): BusConnector {
+  validateBridgePolicy(options.allowedTopics, options.allowedExtensions);
   return new WindowBridgeConnector(options);
 }
 
@@ -50,6 +67,7 @@ async function connectToWindow(
   origin: string,
   timeoutMs: number,
   allowedTopics: readonly string[] | undefined,
+  allowedExtensions: readonly string[] | undefined,
   context: ConnectorContext
 ): Promise<ConnectorResult> {
   const nonce = createInstanceId();
@@ -114,6 +132,7 @@ async function connectToWindow(
               port,
               connectionId,
               allowedTopics,
+              allowedExtensions,
               context.reportError
             )
           });
@@ -162,6 +181,7 @@ async function acceptFromWindow(
   origin: string,
   timeoutMs: number,
   allowedTopics: readonly string[] | undefined,
+  allowedExtensions: readonly string[] | undefined,
   context: ConnectorContext
 ): Promise<ConnectorResult> {
   return new Promise<ConnectorResult>((resolve, reject) => {
@@ -243,6 +263,7 @@ async function acceptFromWindow(
           port,
           event.data.connectionId,
           allowedTopics,
+          allowedExtensions,
           context.reportError
         )
       });
@@ -250,6 +271,27 @@ async function acceptFromWindow(
 
     localWindow.addEventListener("message", onMessage);
   });
+}
+
+function validateBridgePolicy(
+  allowedTopics: readonly string[] | undefined,
+  allowedExtensions: readonly string[] | undefined
+): void {
+  for (const topic of allowedTopics ?? []) {
+    if (!topic.trim() || topic.startsWith("@bmb/")) {
+      throw new InvalidConfigurationError(
+        `Invalid allowed bridge topic "${topic}". Only public application topics may be listed.`
+      );
+    }
+  }
+
+  for (const extensionId of allowedExtensions ?? []) {
+    if (!/^[a-z0-9][a-z0-9._-]*$/i.test(extensionId.trim())) {
+      throw new InvalidConfigurationError(
+        `Invalid allowed bridge extension id "${extensionId}".`
+      );
+    }
+  }
 }
 
 function normalizeOrigin(origin: string): string {

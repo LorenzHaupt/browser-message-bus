@@ -20,6 +20,10 @@ npm install
 npm run typecheck
 npm test
 npm run build
+
+# optional real-browser E2E tests
+npx playwright install chromium
+npm run test:e2e
 ```
 
 ## Core usage

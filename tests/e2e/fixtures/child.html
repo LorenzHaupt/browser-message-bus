@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>BMB child fixture</title></head>
+<body>
+  <script type="module">
+    import { createMessageBus } from "/dist/index.js";
+    import { windowBridge } from "/dist/bridge.js";
+    window.BMB = { createMessageBus, windowBridge };
+  </script>
+</body>
+</html>

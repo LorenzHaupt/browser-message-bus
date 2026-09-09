@@ -5,6 +5,7 @@ import type {
   MessageTarget,
   ObservedMessage
 } from "../core/types.js";
+import { cloneForTransport } from "../core/utils.js";
 import { IndexedDbLogStore, type LogStore } from "./indexed-db-log-store.js";
 
 export interface PersistentLogOptions {
@@ -134,9 +135,9 @@ function toLoggedMessage(message: ObservedMessage): LoggedMessage {
   return {
     id: message.context.messageId,
     topic: message.topic,
-    payload: message.payload,
-    source: message.context.source,
-    ...(message.context.target ? { target: message.context.target } : {}),
+    payload: cloneForTransport(message.payload),
+    source: cloneForTransport(message.context.source),
+    ...(message.context.target ? { target: cloneForTransport(message.context.target) } : {}),
     timestamp: message.context.timestamp
   };
 }

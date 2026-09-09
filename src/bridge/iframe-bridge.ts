@@ -15,6 +15,7 @@ export function iframeBridge(options: IframeBridgeOptions): BusConnector {
     origin: options.origin,
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
     ...(options.allowedTopics ? { allowedTopics: options.allowedTopics } : {}),
+    ...(options.allowedExtensions ? { allowedExtensions: options.allowedExtensions } : {}),
     ...(options.localWindow ? { localWindow: options.localWindow } : {})
   });
 }

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>BMB host fixture</title></head>
+<body>
+  <iframe id="child" src="http://127.0.0.1:4174/tests/e2e/fixtures/child.html"></iframe>
+  <script type="module">
+    import { createMessageBus } from "/dist/index.js";
+    import { iframeBridge } from "/dist/bridge.js";
+    import { persistentLog } from "/dist/persistent-log.js";
+    window.BMB = { createMessageBus, iframeBridge, persistentLog };
+  </script>
+</body>
+</html>

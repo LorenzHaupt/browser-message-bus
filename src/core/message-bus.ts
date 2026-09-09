@@ -24,6 +24,7 @@ import type {
   MessageBusErrorContext,
   MessageBusErrorHandler,
   MessageBusExtension,
+  MessageBusOptions,
   MessageContext,
   MessageHandler,
   MessageMap,
@@ -43,6 +44,7 @@ import {
   cloneForTransport,
   createInstanceId,
   freezeIdentity,
+  freezeTarget,
   matchesTarget,
   normalizeTarget
 } from "./utils.js";
@@ -101,7 +103,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
   private readonly extensions = new Map<string, ExtensionRecord>();
   private isClosed = false;
 
-  constructor(options: MessageBusOptionsLike) {
+  constructor(options: MessageBusOptions) {
     this.channel = assertNonEmpty(options.channel, "channel");
     this.maxHops = options.maxHops ?? DEFAULT_MAX_HOPS;
     if (!Number.isInteger(this.maxHops) || this.maxHops < 1 || this.maxHops > 64) {
@@ -195,13 +197,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
         this.reportError(error, { phase })
     };
 
-    let installation: ExtensionInstallation<TApi>;
-    try {
-      installation = extension.install(context);
-    } catch (error) {
-      this.reportError(error, { phase: "extension" });
-      throw error;
-    }
+    const installation = extension.install(context);
 
     this.extensions.set(id, { installation: installation as ExtensionInstallation<unknown> });
     return installation.api;
@@ -277,7 +273,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
   ): PublishReceipt {
     this.assertOpen();
     const clonedPayload = cloneForTransport(payload);
-    const normalizedTarget = normalizeTarget(target);
+    const normalizedTarget = freezeTarget(normalizeTarget(target));
     const id = createInstanceId();
     const envelope: BusEnvelope = {
       namespace: BUS_NAMESPACE,
@@ -378,24 +374,20 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
       return;
     }
 
-    const context: MessageContext = Object.freeze({
-      messageId: envelope.id,
-      source: envelope.source,
-      ...(envelope.target ? { target: envelope.target } : {}),
-      timestamp: envelope.timestamp
-    });
-
     for (const subscription of subscriptions) {
       if (!subscription.active) {
         continue;
       }
+
+      const payloadSnapshot = cloneForTransport(envelope.payload);
+      const context = createMessageContext(envelope);
 
       subscription.queue = subscription.queue
         .then(async () => {
           if (!subscription.active) {
             return;
           }
-          await subscription.handler(envelope.payload, context);
+          await subscription.handler(payloadSnapshot, context);
         })
         .catch(error => {
           this.reportError(error, { phase: "subscriber", topic: envelope.topic });
@@ -426,18 +418,13 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
       return;
     }
 
-    const message: ObservedMessage = {
-      topic: envelope.topic,
-      payload: envelope.payload,
-      context: {
-        messageId: envelope.id,
-        source: envelope.source,
-        ...(envelope.target ? { target: envelope.target } : {}),
-        timestamp: envelope.timestamp
-      }
-    };
-
     for (const observer of this.observers) {
+      const message: ObservedMessage = {
+        topic: envelope.topic,
+        payload: cloneForTransport(envelope.payload),
+        context: createMessageContext(envelope)
+      };
+
       try {
         observer(message);
       } catch (error) {
@@ -491,12 +478,16 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
   }
 }
 
-interface MessageBusOptionsLike {
-  readonly channel: string;
-  readonly appId?: string;
-  readonly instanceId?: string;
-  readonly maxHops?: number;
-  readonly onError?: MessageBusErrorHandler;
+function createMessageContext(envelope: BusEnvelope): MessageContext {
+  const source = freezeIdentity(envelope.source);
+  const target = freezeTarget(envelope.target);
+
+  return Object.freeze({
+    messageId: envelope.id,
+    source,
+    ...(target ? { target } : {}),
+    timestamp: envelope.timestamp
+  });
 }
 
 function normalizeExtensionTopic(topic: string): string {
