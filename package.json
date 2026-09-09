@@ -1,0 +1,50 @@
+{
+  "name": "@lorenz/browser-message-bus",
+  "version": "1.0.0",
+  "description": "Typed, lightweight browser message bus with BroadcastChannel by default and optional cross-origin bridges and extensions.",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "import": "./dist/bridge.js"
+    },
+    "./presence": {
+      "types": "./dist/presence.d.ts",
+      "import": "./dist/presence.js"
+    },
+    "./request-reply": {
+      "types": "./dist/request-reply.d.ts",
+      "import": "./dist/request-reply.js"
+    },
+    "./persistent-log": {
+      "types": "./dist/persistent-log.d.ts",
+      "import": "./dist/persistent-log.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.0",
+    "vitest": "^4.1.11"
+  }
+}
