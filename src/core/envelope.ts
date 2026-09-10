@@ -26,6 +26,9 @@ function isTarget(value: unknown): value is MessageTarget {
   return validInstance && validApp && (value.instanceId !== undefined || value.appId !== undefined);
 }
 
+/**
+ * Runtime-Grenze für Daten aus Transporten. Geprüft wird das technische Envelope, nicht die fachliche Form der Payload.
+ */
 export function isBusEnvelope(value: unknown): value is BusEnvelope {
   if (!isRecord(value)) {
     return false;

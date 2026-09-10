@@ -3,6 +3,10 @@ import {
   DEFAULT_DEDUPE_TTL_MS
 } from "./constants.js";
 
+/**
+ * Merkt sich kürzlich gesehene messageIds. Der begrenzte Cache verhindert Mehrfachverarbeitung über mehrere Routen,
+ * ohne dauerhaft mit der Laufzeit des Prozesses zu wachsen.
+ */
 export class DeduplicationCache {
   private readonly seen = new Map<string, number>();
 

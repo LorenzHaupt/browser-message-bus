@@ -19,6 +19,9 @@ interface CloseFrame {
 }
 
 
+/**
+ * Dedizierter Transport einer expliziten Window-/iframe-Bridge. Nach dem Handshake läuft der normale Verkehr nur noch über diesen Port.
+ */
 export class MessagePortTransport implements BusTransport {
   readonly kind = "message-port";
   readonly id: string;
@@ -145,6 +148,9 @@ export class MessagePortTransport implements BusTransport {
     });
   };
 
+  /**
+   * Ohne explizite Policy darf der komplette Bus-Verkehr passieren. Sobald eine Allowlist gesetzt ist, gilt deny by default.
+   */
   private isAllowed(envelope: BusEnvelope): boolean {
     if (!this.hasExplicitPolicy) {
       return true;

@@ -1,6 +1,7 @@
 import { BUS_NAMESPACE, PROTOCOL_VERSION } from "../core/constants.js";
 import type { BusIdentity } from "../core/types.js";
 
+/** Technische Nachrichten, die ausschließlich zum Aufbau des dedizierten MessagePort verwendet werden. */
 export type BridgeHandshakeMessage =
   | {
       namespace: typeof BUS_NAMESPACE;

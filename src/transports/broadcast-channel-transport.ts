@@ -1,6 +1,9 @@
 import { UnsupportedEnvironmentError } from "../core/errors.js";
 import type { BusEnvelope, BusTransport, MessageBusErrorHandler } from "../core/types.js";
 
+/**
+ * Standardtransport für Browser-Kontexte desselben Origins. Der Core registriert genau einen Transport pro channel.
+ */
 export class BroadcastChannelTransport implements BusTransport {
   readonly kind = "broadcast-channel";
   readonly id: string;

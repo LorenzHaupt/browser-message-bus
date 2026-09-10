@@ -38,6 +38,10 @@ export function createInstanceId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Nutzt denselben Structured-Clone-Mechanismus, auf dem auch die Browser-Transporte basieren.
+ * Nicht transportierbare Werte werden früh und mit einem domänenspezifischen Fehler abgelehnt.
+ */
 export function cloneForTransport<T>(value: T): T {
   if (typeof structuredClone !== "function") {
     throw new UnsupportedEnvironmentError("structuredClone()");
@@ -67,6 +71,7 @@ export function normalizeTarget(target: MessageTarget | undefined): MessageTarge
   };
 }
 
+/** Prüft ausschließlich die Routing-Semantik eines Targets; eine Autorisierungsentscheidung ist das nicht. */
 export function matchesTarget(
   target: MessageTarget | undefined,
   identity: BusIdentity

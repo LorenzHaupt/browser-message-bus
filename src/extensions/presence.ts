@@ -22,6 +22,9 @@ export interface PresenceApi {
 const DEFAULT_HEARTBEAT_MS = 15_000;
 const DEFAULT_PEER_TIMEOUT_MS = 75_000;
 
+/**
+ * Installiert Best-Effort-Presence. Heartbeats helfen beim Erkennen verschwundener Peers, sind aber keine harte Verfügbarkeitsgarantie.
+ */
 export function presence(options: PresenceOptions = {}): MessageBusExtension<PresenceApi> {
   return {
     id: "presence",

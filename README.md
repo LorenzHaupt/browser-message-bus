@@ -1,32 +1,59 @@
 # Browser Message Bus
 
-A lightweight, typed browser message bus for communication within one browser context, across tabs/windows with `BroadcastChannel`, and across explicit cross-origin window relationships through optional bridges.
+Der Browser Message Bus ist eine kleine, typisierte Bibliothek für die Kommunikation zwischen Browser-Kontexten. Sie deckt den einfachen Fall – Nachrichten zwischen Komponenten oder Tabs – genauso ab wie explizite Verbindungen zu Popups oder Cross-Origin-iframes.
 
-## Design principles
+Die Grundidee ist bewusst schlicht: Eine Anwendung erstellt einen Bus für einen `channel`, abonniert Topics und veröffentlicht Nachrichten. Alles Weitere ist optional.
 
-- **Convention over configuration:** `channel` is the only required option.
-- **BroadcastChannel by default:** no bridge listeners, persistence, heartbeats or request/reply machinery unless explicitly enabled.
-- **Framework independent:** plain TypeScript/JavaScript; Angular, React and other frameworks are consumers, not dependencies.
-- **Typed topics and payloads:** application topics are defined by a TypeScript message map.
-- **Exact topics only:** no wildcard/topic hierarchy in the core.
-- **Explicit cross-origin bridges:** a bridge must be configured on both sides.
-- **Safe defaults:** exact origins, exact `Window` source checks, random handshake nonces, protocol validation, reserved system topics and structured-clone validation.
-- **Best-effort delivery:** this is a browser messaging layer, not a durable broker.
+## Wofür ist die Bibliothek gedacht?
+
+Typische Anwendungsfälle sind:
+
+- Kommunikation zwischen mehreren Tabs oder Fenstern derselben Anwendung;
+- Austausch zwischen Host-Anwendung und eingebettetem iframe;
+- Kommunikation zwischen Microfrontends;
+- gezielte Nachrichten an eine bestimmte laufende Instanz;
+- Request/Reply zwischen Browser-Anwendungen;
+- Erkennung anderer Bus-Teilnehmer über Presence;
+- optionales lokales Mitschreiben ausgewählter Nachrichten in IndexedDB.
+
+Der Message Bus ersetzt keine Backend-API, keinen WebSocket zum Server und keinen dauerhaften Message Broker wie Kafka oder RabbitMQ.
+
+## Grundprinzipien
+
+- **Einfacher Standardfall:** Nur `channel` ist erforderlich.
+- **BroadcastChannel als Standard:** Tabs und Fenster desselben Origins können ohne weitere Konfiguration miteinander kommunizieren.
+- **Framework-unabhängig:** Die Bibliothek hängt weder von Angular noch von React oder einem anderen UI-Framework ab.
+- **Typisierte Topics und Payloads:** Eine TypeScript-Message-Map beschreibt, welche Daten zu welchem Topic gehören.
+- **Exakte Topics:** Der Core kennt bewusst keine Wildcards und keine Topic-Hierarchie.
+- **Explizite Bridges:** Cross-Origin-Kommunikation wird nur eingerichtet, wenn beide Seiten sie bewusst konfigurieren.
+- **Optionale Erweiterungen:** Presence, Request/Reply und Persistent Log werden nur installiert, wenn eine Anwendung sie braucht.
+- **Best-Effort Delivery:** Der Bus ist eine Browser-Kommunikationsschicht, kein dauerhaftes Queue-System.
 
 ## Installation
+
+Wenn das Paket veröffentlicht ist, kann es wie eine normale npm-Bibliothek installiert werden:
+
+```bash
+npm install @lorenz/browser-message-bus
+```
+
+Für die Entwicklung dieses Repositories:
 
 ```bash
 npm install
 npm run typecheck
 npm test
 npm run build
+```
 
-# optional real-browser E2E tests
+Die echten Browser-E2E-Tests benötigen zusätzlich Playwright und einen installierten Browser:
+
+```bash
 npx playwright install chromium
 npm run test:e2e
 ```
 
-## Core usage
+## Schnellstart
 
 ```ts
 import { createMessageBus } from "@lorenz/browser-message-bus";
@@ -34,17 +61,15 @@ import { createMessageBus } from "@lorenz/browser-message-bus";
 interface Messages {
   "document.open": {
     id: string;
-    metadata: {
-      title: string;
-      tags: string[];
-    };
+    title: string;
   };
+
   "viewer.close": undefined;
 }
 
 const bus = createMessageBus<Messages>({
   channel: "workspace",
-  appId: "viewer" // optional
+  appId: "viewer"
 });
 
 const unsubscribe = bus.subscribe("document.open", (payload, context) => {
@@ -54,27 +79,24 @@ const unsubscribe = bus.subscribe("document.open", (payload, context) => {
 
 bus.publish("document.open", {
   id: "4711",
-  metadata: {
-    title: "Example",
-    tags: ["demo"]
-  }
+  title: "Vertrag"
 });
 
 unsubscribe();
 await bus.close();
 ```
 
-`instanceId` is generated automatically for every running bus instance. `appId` is optional and groups instances of the same application type.
+Jede laufende Bus-Instanz erhält automatisch eine eindeutige `instanceId`. Eine optionale `appId` kann mehrere Instanzen derselben Anwendung kennzeichnen.
 
-## Targeting
+## Nachrichten gezielt zustellen
 
-Broadcast is the default:
+Ohne `target` ist eine Nachricht ein Broadcast:
 
 ```ts
 bus.publish("viewer.close");
 ```
 
-All instances with an `appId`:
+Alle Instanzen einer Anwendung lassen sich über `appId` adressieren:
 
 ```ts
 bus.publish("viewer.close", undefined, {
@@ -82,7 +104,7 @@ bus.publish("viewer.close", undefined, {
 });
 ```
 
-Exactly one known instance:
+Eine konkrete laufende Instanz wird über ihre `instanceId` angesprochen:
 
 ```ts
 bus.publish("viewer.close", undefined, {
@@ -90,9 +112,13 @@ bus.publish("viewer.close", undefined, {
 });
 ```
 
-An instance ID becomes known through an incoming message (`context.source.instanceId`), a direct bridge handshake (`connection.remote.instanceId`) or the optional presence extension.
+Eine fremde `instanceId` kann zum Beispiel aus `context.source.instanceId`, aus einem Bridge-Handshake oder über die optionale Presence-Erweiterung bekannt werden.
 
-## Presence (optional)
+**Wichtig:** Targeting ist Routing und keine Zugriffskontrolle. Teilnehmer desselben `BroadcastChannel` teilen sich denselben Transport. Der Channel-Name ist kein Geheimnis und keine Security Boundary.
+
+## Presence
+
+Presence ist optional und zeigt, welche anderen Bus-Instanzen aktuell gesehen werden:
 
 ```ts
 import { presence } from "@lorenz/browser-message-bus/presence";
@@ -101,13 +127,20 @@ const peers = bus.use(presence());
 
 console.log(peers.peers());
 
-peers.onJoin(peer => console.log("joined", peer));
-peers.onLeave(peer => console.log("left", peer));
+peers.onJoin(peer => {
+  console.log("Teilnehmer hinzugekommen", peer);
+});
+
+peers.onLeave(peer => {
+  console.log("Teilnehmer nicht mehr erreichbar", peer);
+});
 ```
 
-Presence is deliberately not part of the default bus. It uses a small announce/query/heartbeat protocol and is best-effort because browsers may throttle background tabs.
+Presence arbeitet mit Announce-, Query- und Heartbeat-Nachrichten. Da Browser Hintergrund-Tabs drosseln können, ist die Erkennung bewusst als Best-Effort-Funktion zu verstehen.
 
-## Request / reply (optional)
+## Request/Reply
+
+Für Aufrufe mit Antwort gibt es die optionale Request/Reply-Erweiterung:
 
 ```ts
 import { requestReply } from "@lorenz/browser-message-bus/request-reply";
@@ -119,26 +152,26 @@ interface Requests {
   };
 }
 
-const requests = bus.use(requestReply<Requests>());
+const rpc = bus.use(requestReply<Requests>());
 
-requests.handle("settings.get", async request => {
+rpc.handle("settings.get", async request => {
   return { theme: "dark" };
 });
 
-const result = await requests.request(
+const settings = await rpc.request(
   "settings.get",
   { userId: "123" },
   { target: { instanceId: anotherInstanceId } }
 );
 ```
 
-If a request can reach multiple handlers, the first valid response wins. For deterministic request/reply, target a concrete instance.
+Erreicht ein ungezielter Request mehrere Handler, gewinnt die erste gültige Antwort. Wenn genau eine Instanz antworten soll, sollte der Request deshalb gezielt gesendet werden.
 
-## Cross-origin bridge (optional and explicit)
+## Cross-Origin Bridge
 
-`BroadcastChannel` is always the default transport. A bridge is only active when `connect()` is called.
+`BroadcastChannel` kann nicht über unterschiedliche Origins hinweg kommunizieren. Dafür gibt es explizite Bridges.
 
-Host with an iframe:
+Host mit iframe:
 
 ```ts
 import { iframeBridge } from "@lorenz/browser-message-bus/bridge";
@@ -153,7 +186,7 @@ const connection = await bus.connect(
 console.log(connection.remote.instanceId);
 ```
 
-Inside the cross-origin iframe:
+Im iframe:
 
 ```ts
 import { windowBridge } from "@lorenz/browser-message-bus/bridge";
@@ -167,26 +200,24 @@ await bus.connect(
 );
 ```
 
-For a popup or another known `Window`, use `windowBridge()` with `mode: "connect"` on one side and `mode: "accept"` on the other.
+`window.postMessage()` wird nur für den Handshake verwendet. Danach läuft der normale Nachrichtenaustausch über einen dedizierten `MessagePort`.
 
-The handshake uses `window.postMessage()` only to establish a dedicated `MessageChannel`. Normal traffic then uses the transferred `MessagePort`.
+Eine Bridge kann zusätzlich eingeschränkt werden:
 
-### Bridge security
+```ts
+iframeBridge({
+  iframe,
+  origin: "https://viewer.example.com",
+  allowedTopics: ["document.open", "viewer.close"],
+  allowedExtensions: ["request-reply"]
+});
+```
 
-The bridge:
+Sobald mindestens eine Allowlist gesetzt ist, gilt für diese Bridge **deny by default**. Nicht freigegebene Anwendungstopics oder Extension-Nachrichten werden nicht übertragen.
 
-- rejects `"*"` and opaque `"null"` origins;
-- requires an exact HTTP(S) origin;
-- checks both `event.origin` and the exact `event.source` window;
-- treats `BroadcastChannel` as a transport, not an authentication boundary (a channel name is not a secret);
-- checks channel and protocol version;
-- uses random handshake nonces;
-- validates transferred envelopes;
-- can optionally restrict public topics with `allowedTopics`.
+## Persistent Log
 
-TypeScript types do **not** validate untrusted runtime payload shapes. Applications that treat cross-origin payloads as untrusted data should validate domain payloads at the application boundary (for example with their schema validator of choice).
-
-## Persistent log (optional)
+Ausgewählte öffentliche Nachrichten können optional in IndexedDB protokolliert werden:
 
 ```ts
 import { persistentLog } from "@lorenz/browser-message-bus/persistent-log";
@@ -195,8 +226,7 @@ const log = bus.use(
   persistentLog({
     topics: ["document.open"],
     maxAgeMs: 7 * 24 * 60 * 60_000,
-    maxEntries: 10_000,
-    requestPersistentStorage: true
+    maxEntries: 10_000
   })
 );
 
@@ -207,32 +237,45 @@ const entries = await log.read({
   order: "desc",
   limit: 100
 });
-
-await log.flush();
 ```
 
-The log is stored in IndexedDB. Records use `messageId` as their key, so the same message observed by multiple same-origin tabs is idempotent in a shared database.
+Das Persistent Log ist kein manipulationssicheres Auditlog und wird von der Bibliothek nicht verschlüsselt. Es sollte nur Daten enthalten, die für browserseitige Speicherung geeignet sind.
 
-The persistent log is **not an audit/security log** and is not encrypted by the library. Same-origin script with access to the page can also access IndexedDB. Persist only data appropriate for browser-side storage.
+## Zustellungsmodell
 
-## Delivery semantics
+Der Bus gibt bewusst keine stärkeren Garantien vor, als Browser-Transporte zuverlässig leisten können:
 
-- Local publish plus BroadcastChannel is active by default.
-- Messages are broadcast unless `target` is set.
-- A `messageId` is generated for every message.
-- Duplicate message IDs are processed at most once by a running bus instance.
-- Messages may be forwarded through explicit bridges; hop count prevents routing loops.
-- There is no exactly-once, offline queue or automatic replay guarantee.
-- A subscriber is isolated from other subscribers; a slow/throwing handler does not block another subscription.
-- Browser transport ordering is preserved where the browser transport guarantees it; there is no global ordering across multiple senders/routes.
+- lokale Zustellung und `BroadcastChannel` sind standardmäßig aktiv;
+- jede Nachricht erhält eine `messageId`;
+- dieselbe `messageId` wird von einer laufenden Instanz höchstens einmal verarbeitet;
+- Bridges können Nachrichten zwischen Bus-Segmenten weiterleiten;
+- ein Hop-Limit verhindert Endlosschleifen bei zyklischen Topologien;
+- Subscriber sind voneinander isoliert und erhalten eigene Payload-Snapshots;
+- ein langsamer oder fehlerhafter Subscriber blockiert andere Subscriber nicht;
+- innerhalb eines einzelnen Subscribers bleibt die FIFO-Reihenfolge erhalten;
+- es gibt keine Exactly-Once-Garantie, keine Offline-Queue und keine automatische Wiederholung verlorener Nachrichten;
+- es gibt keine globale Reihenfolge über mehrere Sender und Transportwege hinweg.
 
-## What is intentionally not included
+## Bewusst nicht Bestandteil der Bibliothek
 
-- wildcard/topic hierarchy;
-- automatic bridge discovery;
-- diagnostics/metrics framework;
-- broker/queue semantics;
-- leader election;
-- distributed transactions;
-- exactly-once delivery;
-- framework dependencies.
+Nicht vorgesehen sind unter anderem:
+
+- Wildcard-Topics und komplexe Topic-Hierarchien;
+- automatische Bridge-Erkennung;
+- Authentifizierung oder Benutzerautorisierung;
+- ein Rollen- oder ACL-System;
+- dauerhafte Queue-/Broker-Semantik;
+- Exactly-Once Delivery;
+- Leader Election oder Distributed Transactions;
+- Framework-spezifische Abhängigkeiten.
+
+Diese Begrenzung ist Absicht: Der Message Bus soll eine kleine, verständliche Kommunikationsschicht für Browser-Anwendungen bleiben.
+
+## Weitere Dokumentation
+
+- [Architektur](docs/ARCHITEKTUR.md) – Aufbau, Routing, Bridges, Extensions und Sicherheitsgrenzen
+- [Tests](docs/TESTS.md) – Testaufbau, Testszenarien und E2E-Umgebung
+
+## Lizenz
+
+MIT. Siehe [LICENSE](LICENSE).

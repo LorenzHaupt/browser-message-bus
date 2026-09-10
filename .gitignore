@@ -1,6 +1,11 @@
 node_modules/
 dist/
 coverage/
+
+test-results/
+playwright-report/
+blob-report/
+
 .idea/
 *.log
 .DS_Store

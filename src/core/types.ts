@@ -1,15 +1,25 @@
+/**
+ * Beschreibt die fachlichen Topics einer Anwendung und die jeweils dazugehörige Payload.
+ * Die konkrete Message-Map wird vom Consumer als generischer Typparameter angegeben.
+ */
 export type MessageMap = object;
 
+/** Identität genau einer laufenden Bus-Instanz. appId gruppiert optional mehrere Instanzen derselben Anwendung. */
 export interface BusIdentity {
   readonly instanceId: string;
   readonly appId?: string;
 }
 
+/**
+ * Optionales Routing-Ziel einer Nachricht. Sind instanceId und appId gesetzt, müssen beide zur Empfängerinstanz passen.
+ * Das Target ist keine Security- oder Vertraulichkeitsgrenze.
+ */
 export interface MessageTarget {
   readonly instanceId?: string;
   readonly appId?: string;
 }
 
+/** Technische Metadaten, die ein Subscriber zusätzlich zur fachlichen Payload erhält. */
 export interface MessageContext {
   readonly messageId: string;
   readonly source: BusIdentity;
@@ -50,6 +60,7 @@ export type MessageBusErrorHandler = (
   context: MessageBusErrorContext
 ) => void;
 
+/** Konfiguration des Core. Nur channel ist für den normalen Betrieb erforderlich. */
 export interface MessageBusOptions {
   readonly channel: string;
   readonly appId?: string;
@@ -65,6 +76,7 @@ export type MessageHandler<T> = (
   context: MessageContext
 ) => void | Promise<void>;
 
+/** Repräsentiert eine explizit aufgebaute zusätzliche Verbindung, zum Beispiel zu einem iframe oder Popup. */
 export interface BusConnection {
   readonly id: string;
   readonly remote: BusIdentity;
@@ -77,6 +89,9 @@ export interface BusConnector {
   connect(context: ConnectorContext): Promise<ConnectorResult>;
 }
 
+/**
+ * Erweiterung mit eigener API. Extensions nutzen nur den schmalen ExtensionContext und bleiben dadurch vom Core entkoppelt.
+ */
 export interface MessageBusExtension<TApi> {
   readonly id: string;
   install(context: ExtensionContext): ExtensionInstallation<TApi>;
@@ -125,6 +140,9 @@ export interface ConnectorResult {
   readonly remote: BusIdentity;
 }
 
+/**
+ * Interne Transport-Abstraktion. Der Core routet Envelopes unabhängig davon, ob sie über BroadcastChannel oder MessagePort laufen.
+ */
 export interface BusTransport {
   readonly id: string;
   readonly kind: string;
@@ -138,6 +156,9 @@ export interface BusTransport {
   close(notifyRemote?: boolean): void | Promise<void>;
 }
 
+/**
+ * Internes Transportformat einer Nachricht. Anwendungscode arbeitet normalerweise nur mit Payload und MessageContext.
+ */
 export interface BusEnvelope {
   readonly namespace: "browser-message-bus";
   readonly protocolVersion: 1;
@@ -153,6 +174,7 @@ export interface BusEnvelope {
 
 export type TopicOf<M extends MessageMap> = keyof M & string;
 
+/** Öffentliche, bewusst kleine API des Message Bus. */
 export interface MessageBus<M extends MessageMap> {
   readonly channel: string;
   readonly identity: BusIdentity;

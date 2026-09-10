@@ -60,6 +60,7 @@ interface ExtensionRecord {
   installation: ExtensionInstallation<unknown>;
 }
 
+/** Hält den sichtbaren Lifecycle einer mit connect() aufgebauten Transportverbindung. */
 class ConnectionImpl implements BusConnection {
   private isConnected = true;
 
@@ -86,6 +87,10 @@ class ConnectionImpl implements BusConnection {
   }
 }
 
+/**
+ * Zentrale Routing-Instanz. Sie verbindet lokale Zustellung, Transporte und Extensions,
+ * ohne transport- oder framework-spezifische Details in die öffentliche API zu ziehen.
+ */
 export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
   readonly channel: string;
   readonly identity: BusIdentity;
@@ -103,6 +108,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
   private readonly extensions = new Map<string, ExtensionRecord>();
   private isClosed = false;
 
+  /** Validiert die Identität und startet den standardmäßigen BroadcastChannel-Transport. */
   constructor(options: MessageBusOptions) {
     this.channel = assertNonEmpty(options.channel, "channel");
     this.maxHops = options.maxHops ?? DEFAULT_MAX_HOPS;
@@ -134,6 +140,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     return this.isClosed;
   }
 
+  /** Veröffentlicht eine fachliche Nachricht und gibt ihre eindeutige messageId zurück. */
   publish<K extends TopicOf<M>>(
     topic: K,
     ...args: PublishArguments<M[K]>
@@ -145,6 +152,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     return this.publishEnvelope(topic, payload, options.target, false);
   }
 
+  /** Registriert einen Subscriber. Ein optionales AbortSignal kann die Subscription automatisch beenden. */
   subscribe<K extends TopicOf<M>>(
     topic: K,
     handler: MessageHandler<M[K]>,
@@ -170,6 +178,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     return unsubscribe;
   }
 
+  /** Installiert eine optionale semantische Erweiterung in einem reservierten internen Topic-Namensraum. */
   use<TApi>(extension: MessageBusExtension<TApi>): TApi {
     this.assertOpen();
     const id = assertExtensionId(extension.id);
@@ -203,6 +212,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     return installation.api;
   }
 
+  /** Baut über einen Connector einen zusätzlichen Transportweg auf, ohne die normale Bus-API zu verändern. */
   async connect(connector: BusConnector): Promise<BusConnection> {
     this.assertOpen();
 
@@ -230,6 +240,9 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     return connection;
   }
 
+  /**
+   * Schließt den Bus idempotent. Extensions werden zuerst disposed, danach Connections, Transporte und lokaler Zustand.
+   */
   async close(): Promise<void> {
     if (this.isClosed) {
       return;
@@ -265,6 +278,10 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     this.dedupe.clear();
   }
 
+  /**
+   * Gemeinsamer Publish-Pfad für öffentliche und interne Extension-Nachrichten.
+   * Die Payload wird vor der ersten Zustellung geklont, damit nur transportierbare Daten in den Bus gelangen.
+   */
   private publishEnvelope(
     topic: string,
     payload: unknown,
@@ -332,6 +349,9 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     }
   }
 
+  /**
+   * Verarbeitet eingehende Envelopes genau einmal pro laufender Instanz und leitet sie bei Bedarf an andere Transporte weiter.
+   */
   private receive(value: BusEnvelope, incomingTransportId: string): void {
     if (this.isClosed) {
       return;
@@ -363,6 +383,10 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     this.forward({ ...value, hop: value.hop + 1 }, incomingTransportId);
   }
 
+  /**
+   * Stellt lokal zu. Jeder Subscriber bekommt einen eigenen Snapshot und eine eigene FIFO-Promise-Kette,
+   * sodass Mutation und langsame Handler andere Subscriptions nicht beeinflussen.
+   */
   private deliverLocally(envelope: BusEnvelope): void {
     if (!matchesTarget(envelope.target, this.identity)) {
       return;
@@ -395,6 +419,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     }
   }
 
+  /** Leitet eine Nachricht an alle Transporte außer demjenigen weiter, über den sie gerade angekommen ist. */
   private forward(envelope: BusEnvelope, excludeTransportId?: string): void {
     for (const transport of this.transports.values()) {
       if (transport.id === excludeTransportId) {
@@ -413,6 +438,7 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     }
   }
 
+  /** Liefert öffentliche Nachrichten als isolierte Snapshots an Observer-Extensions wie das Persistent Log. */
   private observe(envelope: BusEnvelope): void {
     if (envelope.system || this.observers.size === 0) {
       return;

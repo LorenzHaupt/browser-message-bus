@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+// E2E: Zwei echte Seiten desselben Origins kommunizieren über den nativen BroadcastChannel.
 test("communicates between two real same-origin tabs through BroadcastChannel", async ({ context }) => {
   const first = await context.newPage();
   const second = await context.newPage();
@@ -29,6 +30,7 @@ test("communicates between two real same-origin tabs through BroadcastChannel", 
   expect(await first.evaluate(() => (window as any).received[0])).toEqual({ value: 42 });
 });
 
+// E2E: Unterschiedliche Ports erzeugen zwei Origins; der Handshake muss einen echten MessagePort übertragen.
 test("bridges a real cross-origin iframe with an explicit MessagePort connection", async ({ page }) => {
   await page.goto("http://127.0.0.1:4173/tests/e2e/fixtures/host.html");
   await page.waitForFunction(() => Boolean((window as any).BMB));
@@ -91,6 +93,7 @@ test("bridges a real cross-origin iframe with an explicit MessagePort connection
   await expect.poll(() => page.evaluate(() => (window as any).hostReceived.length)).toBe(1);
 });
 
+// E2E: Dieser Test verwendet die IndexedDB-Implementierung des Browsers statt fake-indexeddb.
 test("persists and reads a message with real browser IndexedDB", async ({ page }) => {
   await page.goto("http://127.0.0.1:4173/tests/e2e/fixtures/host.html");
   await page.waitForFunction(() => Boolean((window as any).BMB));

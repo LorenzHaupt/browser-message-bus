@@ -22,6 +22,7 @@ import {
 const DEFAULT_TIMEOUT_MS = 10_000;
 const HELLO_RETRY_MS = 250;
 
+/** Baut eine explizite Beziehung zu genau einem bekannten Window und einem exakten Origin auf. */
 class WindowBridgeConnector implements BusConnector {
   readonly kind = "window";
 
@@ -56,11 +57,15 @@ class WindowBridgeConnector implements BusConnector {
   }
 }
 
+/** Erzeugt den generischen Connector für iframe-, Popup- oder andere bekannte Window-Beziehungen. */
 export function windowBridge(options: WindowBridgeOptions): BusConnector {
   validateBridgePolicy(options.allowedTopics, options.allowedExtensions);
   return new WindowBridgeConnector(options);
 }
 
+/**
+ * Aktive Seite des Handshakes: hello → ready → connect. Der MessagePort wird erst nach erfolgreicher Gegenprüfung übernommen.
+ */
 async function connectToWindow(
   localWindow: Window,
   targetWindow: Window,
@@ -175,6 +180,9 @@ async function connectToWindow(
   });
 }
 
+/**
+ * Passive Seite des Handshakes. Nur Nachrichten vom erwarteten Window, Origin und channel können eine Verbindung aufbauen.
+ */
 async function acceptFromWindow(
   localWindow: Window,
   targetWindow: Window,
@@ -294,6 +302,7 @@ function validateBridgePolicy(
   }
 }
 
+/** Erzwingt einen exakten HTTP(S)-Origin; Wildcards, opaque Origins und URLs mit Pfad werden absichtlich abgelehnt. */
 function normalizeOrigin(origin: string): string {
   if (origin === "*" || origin === "null") {
     throw new BridgeSecurityError("Bridge origin must be an explicit HTTP(S) origin and may not be \"*\" or \"null\".");

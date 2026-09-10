@@ -80,6 +80,10 @@ interface PendingRequest {
   abortCleanup?: () => void;
 }
 
+/**
+ * Legt ein korreliertes Request/Reply-Protokoll über normale interne Bus-Nachrichten.
+ * Timeouts und AbortSignal verhindern dauerhaft offene Requests.
+ */
 export function requestReply<R extends ValidRequestMap<R>>(
   options: RequestReplyOptions = {}
 ): MessageBusExtension<RequestReplyApi<R>> {

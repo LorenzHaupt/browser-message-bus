@@ -1,3 +1,4 @@
+/** Optionale Allowlist für den Datenverkehr über genau diese Bridge. */
 export interface BridgeTopicPolicy {
   /** Public application topics allowed across this bridge. */
   readonly allowedTopics?: readonly string[];

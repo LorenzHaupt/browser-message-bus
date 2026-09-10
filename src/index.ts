@@ -1,6 +1,10 @@
 import { BrowserMessageBus } from "./core/message-bus.js";
 import type { MessageBus, MessageBusOptions, MessageMap } from "./core/types.js";
 
+/**
+ * Erzeugt eine sofort einsatzbereite Bus-Instanz.
+ * Der konfigurierte BroadcastChannel wird direkt eingerichtet; ein separates start() ist nicht nötig.
+ */
 export function createMessageBus<M extends MessageMap>(
   options: MessageBusOptions
 ): MessageBus<M> {

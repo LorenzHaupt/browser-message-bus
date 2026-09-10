@@ -43,6 +43,7 @@ export interface PersistentLogApi {
 const DEFAULT_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
 const DEFAULT_MAX_ENTRIES = 10_000;
 
+/** Erstellt die IndexedDB-basierte Persistent-Log-Extension mit den produktiven Standardwerten. */
 export function persistentLog(
   options: PersistentLogOptions = {}
 ): MessageBusExtension<PersistentLogApi> {
@@ -51,6 +52,9 @@ export function persistentLog(
   );
 }
 
+/**
+ * Separater Factory-Einstieg, damit die Extension in Tests mit einem kontrollierten LogStore betrieben werden kann.
+ */
 export function createPersistentLogExtension(
   options: PersistentLogOptions,
   storeFactory: (databaseName: string, requestPersistentStorage: boolean) => LogStore

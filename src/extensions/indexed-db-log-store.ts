@@ -15,6 +15,9 @@ export interface LogStore {
   close(): void;
 }
 
+/**
+ * IndexedDB-Implementierung des LogStore. Indizes auf timestamp und [topic, timestamp] halten die üblichen Lesewege effizient.
+ */
 export class IndexedDbLogStore implements LogStore {
   private database: IDBDatabase | undefined;
 
