@@ -184,6 +184,9 @@ const connection = await bus.connect(
 );
 
 console.log(connection.remote.instanceId);
+
+// Wird erfüllt, wenn die Verbindung lokal oder von der Gegenseite geschlossen wird.
+await connection.closed;
 ```
 
 Im iframe:
@@ -239,7 +242,7 @@ const entries = await log.read({
 });
 ```
 
-Das Persistent Log ist kein manipulationssicheres Auditlog und wird von der Bibliothek nicht verschlüsselt. Es sollte nur Daten enthalten, die für browserseitige Speicherung geeignet sind.
+Das Persistent Log speichert nur öffentliche Nachrichten, die der jeweiligen Bus-Instanz fachlich zugestellt wurden. Eine Nachricht, die gezielt an eine andere `instanceId` adressiert ist, landet deshalb nicht im lokalen Log. Der Log ist kein manipulationssicheres Auditlog und wird von der Bibliothek nicht verschlüsselt. Er sollte nur Daten enthalten, die für browserseitige Speicherung geeignet sind.
 
 ## Zustellungsmodell
 
@@ -249,6 +252,7 @@ Der Bus gibt bewusst keine stärkeren Garantien vor, als Browser-Transporte zuve
 - jede Nachricht erhält eine `messageId`;
 - dieselbe `messageId` wird von einer laufenden Instanz höchstens einmal verarbeitet;
 - Bridges können Nachrichten zwischen Bus-Segmenten weiterleiten;
+- erreicht eine Nachricht ihre konkrete `instanceId`, endet die Weiterleitung dort; Broadcasts und `appId`-Targets können weiterhin mehrere Segmente erreichen;
 - ein Hop-Limit verhindert Endlosschleifen bei zyklischen Topologien;
 - Subscriber sind voneinander isoliert und erhalten eigene Payload-Snapshots;
 - ein langsamer oder fehlerhafter Subscriber blockiert andere Subscriber nicht;
@@ -273,8 +277,7 @@ Diese Begrenzung ist Absicht: Der Message Bus soll eine kleine, verständliche K
 
 ## Weitere Dokumentation
 
-- [Architektur](docs/ARCHITEKTUR.md) – Aufbau, Routing, Bridges, Extensions und Sicherheitsgrenzen
-- [Tests](docs/TESTS.md) – Testaufbau, Testszenarien und E2E-Umgebung
+- [Architektur](ARCHITEKTUR.md) – Aufbau, Routing, Bridges, Extensions und Sicherheitsgrenzen
 
 ## Lizenz
 

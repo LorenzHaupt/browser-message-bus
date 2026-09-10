@@ -166,6 +166,8 @@ Host Tab B
 
 Beim Weiterleiten wird der eingehende Transport ausgelassen. Zusätzlich verhindern `messageId`, Deduplizierungs-Cache und Hop-Zähler Schleifen und Mehrfachverarbeitung.
 
+Ist eine Nachricht an eine konkrete `instanceId` adressiert und erreicht genau diese Instanz, endet das Routing dort. Bei Broadcasts und reinen `appId`-Targets wird dagegen weitergeroutet, weil in anderen Bus-Segmenten weitere passende Empfänger existieren können.
+
 ## Deduplizierung und Hop-Limit
 
 Jede neu erzeugte Nachricht erhält eine eindeutige ID. Eine Instanz merkt sich bereits gesehene IDs für eine begrenzte Zeit.
@@ -247,7 +249,7 @@ Wenn mehrere Handler einen ungezielten Request erhalten, gewinnt die erste passe
 
 ### Persistent Log
 
-Das Persistent Log beobachtet ausschließlich öffentliche Nachrichten und schreibt ausgewählte Topics in IndexedDB.
+Das Persistent Log beobachtet ausschließlich öffentliche Nachrichten, die der lokalen Bus-Instanz fachlich zugestellt wurden, und schreibt ausgewählte Topics in IndexedDB. Ein Target für eine andere `instanceId` wird daher nicht lokal protokolliert.
 
 Schreiboperationen laufen über eine Promise-Kette, damit die Reihenfolge der Store-Operationen kontrollierbar bleibt. Regelmäßiges Cleanup begrenzt Alter und Anzahl der Einträge.
 
@@ -269,7 +271,9 @@ Fehler, die einen synchronen API-Aufruf grundsätzlich unmöglich machen – zum
 
 Eine bereits geschlossene Instanz akzeptiert keine neuen Publish-, Subscribe-, Use- oder Connect-Aufrufe mehr.
 
-Ein möglicher späterer Ausbaupunkt ist die explizitere Beobachtung eines unerwarteten Bridge-Abbruchs, etwa über ein `connection.closed`-Promise. Automatisches Reconnect gehört bewusst nicht in den Core, weil die Anwendung entscheiden sollte, ob und wann eine neue Verbindung sinnvoll ist.
+Eine `BusConnection` stellt neben `connected` ein `closed`-Promise bereit. Es wird erfüllt, wenn die Verbindung lokal geschlossen wird oder der entfernte `MessagePort` entkoppelt wird. Dadurch kann eine Anwendung beispielsweise auf das Schließen oder Navigieren eines Viewer-Fensters reagieren.
+
+Ein automatisches Reconnect gehört bewusst nicht in den Core. Die Anwendung entscheidet selbst, ob und wann eine neue Verbindung sinnvoll ist. Damit bleibt der Lifecycle beobachtbar, ohne einen zusätzlichen Heartbeat- oder Reconnect-Mechanismus in die Bibliothek einzubauen.
 
 ## Build- und Paketgrenzen
 

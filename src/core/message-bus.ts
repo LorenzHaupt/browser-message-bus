@@ -63,27 +63,39 @@ interface ExtensionRecord {
 /** Hält den sichtbaren Lifecycle einer mit connect() aufgebauten Transportverbindung. */
 class ConnectionImpl implements BusConnection {
   private isConnected = true;
+  private resolveClosed!: () => void;
+  readonly closed: Promise<void>;
 
   constructor(
     readonly id: string,
     readonly remote: BusIdentity,
     private readonly closeTransport: () => Promise<void>
-  ) {}
+  ) {
+    this.closed = new Promise<void>(resolve => {
+      this.resolveClosed = resolve;
+    });
+  }
 
   get connected(): boolean {
     return this.isConnected;
   }
 
   markClosed(): void {
-    this.isConnected = false;
-  }
-
-  async close(): Promise<void> {
     if (!this.isConnected) {
       return;
     }
     this.isConnected = false;
+    this.resolveClosed();
+  }
+
+  async close(): Promise<void> {
+    if (!this.isConnected) {
+      await this.closed;
+      return;
+    }
+
     await this.closeTransport();
+    this.markClosed();
   }
 }
 
@@ -308,7 +320,11 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     this.dedupe.hasOrAdd(id, envelope.timestamp);
     this.observe(envelope);
     this.deliverLocally(envelope);
-    this.forward(envelope);
+
+    // Ein konkretes Ziel muss nach erfolgreicher lokaler Zustellung nicht mehr in andere Bus-Segmente gelangen.
+    if (!this.hasReachedConcreteTarget(envelope)) {
+      this.forward(envelope);
+    }
 
     return { messageId: id };
   }
@@ -376,7 +392,9 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     this.observe(value);
     this.deliverLocally(value);
 
-    if (value.hop >= this.maxHops) {
+    // Sobald die konkret adressierte Instanz erreicht ist, endet das Routing hier.
+    // appId-Targets und Broadcasts werden weiterhin weitergeleitet, weil mehrere Empfänger passen können.
+    if (this.hasReachedConcreteTarget(value) || value.hop >= this.maxHops) {
       return;
     }
 
@@ -438,9 +456,13 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
     }
   }
 
-  /** Liefert öffentliche Nachrichten als isolierte Snapshots an Observer-Extensions wie das Persistent Log. */
+  /** Liefert fachlich zugestellte öffentliche Nachrichten als isolierte Snapshots an Observer-Extensions. */
   private observe(envelope: BusEnvelope): void {
-    if (envelope.system || this.observers.size === 0) {
+    if (
+      envelope.system ||
+      this.observers.size === 0 ||
+      !matchesTarget(envelope.target, this.identity)
+    ) {
       return;
     }
 
@@ -457,6 +479,17 @@ export class BrowserMessageBus<M extends MessageMap> implements MessageBus<M> {
         this.reportError(error, { phase: "extension", topic: envelope.topic });
       }
     }
+  }
+
+  /**
+   * Ein instanceId-Target ist endgültig, sobald genau diese Instanz erreicht wurde.
+   * Bei appId-Targets und Broadcasts darf das Routing dagegen weitere passende Segmente erreichen.
+   */
+  private hasReachedConcreteTarget(envelope: BusEnvelope): boolean {
+    return (
+      envelope.target?.instanceId === this.instanceId &&
+      matchesTarget(envelope.target, this.identity)
+    );
   }
 
   private addSubscription(

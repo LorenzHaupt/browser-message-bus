@@ -81,6 +81,10 @@ export interface BusConnection {
   readonly id: string;
   readonly remote: BusIdentity;
   readonly connected: boolean;
+
+  /** Wird erfüllt, sobald die Verbindung lokal oder von der Gegenseite geschlossen wurde. */
+  readonly closed: Promise<void>;
+
   close(): Promise<void>;
 }
 

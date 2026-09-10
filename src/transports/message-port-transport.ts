@@ -58,6 +58,8 @@ export class MessagePortTransport implements BusTransport {
     this.remoteClose = remoteClose;
     this.port.addEventListener("message", this.onMessage);
     this.port.addEventListener("messageerror", this.onMessageError);
+    // Der HTML-Standard meldet auch das Entkoppeln des entfernten Ports, etwa wenn dessen Document zerstört wird.
+    (this.port as EventTarget).addEventListener("close", this.onPortClose);
     this.port.start();
   }
 
@@ -96,8 +98,7 @@ export class MessagePortTransport implements BusTransport {
       }
     }
 
-    this.port.removeEventListener("message", this.onMessage);
-    this.port.removeEventListener("messageerror", this.onMessageError);
+    this.detachListeners();
     this.port.close();
     this.receive = undefined;
     this.remoteClose = undefined;
@@ -118,11 +119,7 @@ export class MessagePortTransport implements BusTransport {
     }
 
     if (value.type === "bridge:close") {
-      this.isClosed = true;
-      this.port.removeEventListener("message", this.onMessage);
-      this.port.removeEventListener("messageerror", this.onMessageError);
-      this.port.close();
-      this.remoteClose?.();
+      this.finishRemoteClose();
       return;
     }
 
@@ -147,6 +144,31 @@ export class MessagePortTransport implements BusTransport {
       transportId: this.id
     });
   };
+
+  /** Wird ausgelöst, wenn der entfernte MessagePort entkoppelt wird, zum Beispiel beim Zerstören seines Documents. */
+  private readonly onPortClose = (): void => {
+    this.finishRemoteClose();
+  };
+
+  private finishRemoteClose(): void {
+    if (this.isClosed) {
+      return;
+    }
+
+    this.isClosed = true;
+    const remoteClose = this.remoteClose;
+    this.detachListeners();
+    this.port.close();
+    this.receive = undefined;
+    this.remoteClose = undefined;
+    remoteClose?.();
+  }
+
+  private detachListeners(): void {
+    this.port.removeEventListener("message", this.onMessage);
+    this.port.removeEventListener("messageerror", this.onMessageError);
+    (this.port as EventTarget).removeEventListener("close", this.onPortClose);
+  }
 
   /**
    * Ohne explizite Policy darf der komplette Bus-Verkehr passieren. Sobald eine Allowlist gesetzt ist, gilt deny by default.

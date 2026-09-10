@@ -91,6 +91,13 @@ test("bridges a real cross-origin iframe with an explicit MessagePort connection
     (window as any).childBus.publish("pong", { value: "from-child" }, { target: { instanceId: "host" } });
   });
   await expect.poll(() => page.evaluate(() => (window as any).hostReceived.length)).toBe(1);
+
+  const closed = page.evaluate(async () => {
+    await (window as any).hostConnection.closed;
+    return (window as any).hostConnection.connected;
+  });
+  await page.evaluate(() => document.getElementById("child")?.remove());
+  await expect(closed).resolves.toBe(false);
 });
 
 // E2E: Dieser Test verwendet die IndexedDB-Implementierung des Browsers statt fake-indexeddb.

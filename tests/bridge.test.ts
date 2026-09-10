@@ -42,6 +42,7 @@ interface RemoteHarness {
   get connectionId(): string | undefined;
   readonly received: BusEnvelope[];
   sendEnvelope(envelope: BusEnvelope): void;
+  closeRemote(): void;
 }
 
 function createRemoteHarness(
@@ -118,6 +119,9 @@ function createRemoteHarness(
         connectionId,
         envelope
       });
+    },
+    closeRemote() {
+      remotePort?.close();
     }
   };
 }
@@ -183,6 +187,31 @@ describe("window bridge", () => {
     await bus.close();
   });
 
+  it("exposes a closed promise when the remote MessagePort disappears", async () => {
+    const channel = uniqueChannel();
+    const origin = "https://remote.example";
+    const hostWindow = new FakeLocalWindow();
+    const remote = createRemoteHarness(hostWindow, origin, channel);
+    const host = createMessageBus<Messages>({ channel });
+
+    const connection = await host.connect(
+      windowBridge({
+        targetWindow: remote.window,
+        localWindow: hostWindow as unknown as Window,
+        origin,
+        mode: "connect"
+      })
+    );
+
+    expect(connection.connected).toBe(true);
+    remote.closeRemote();
+
+    await connection.closed;
+    expect(connection.connected).toBe(false);
+
+    await host.close();
+  });
+
   it("routes messages between a bridged remote context and another same-origin tab", async () => {
     const channel = uniqueChannel();
     const origin = "https://remote.example";
@@ -231,4 +260,32 @@ describe("window bridge", () => {
     await connection.close();
     await Promise.all([hostA.close(), hostB.close()]);
   });
+
+  it("does not forward a message after its concrete local target has been reached", async () => {
+    const channel = uniqueChannel();
+    const origin = "https://remote.example";
+    const hostWindow = new FakeLocalWindow();
+    const remote = createRemoteHarness(hostWindow, origin, channel);
+    const host = createMessageBus<Messages>({ channel, instanceId: "host-target" });
+    const local = vi.fn();
+    host.subscribe("ping", local);
+
+    await host.connect(
+      windowBridge({
+        targetWindow: remote.window,
+        localWindow: hostWindow as unknown as Window,
+        origin,
+        mode: "connect"
+      })
+    );
+
+    host.publish("ping", { value: 33 }, { target: { instanceId: host.instanceId } });
+
+    await waitFor(() => local.mock.calls.length === 1);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    expect(remote.received).toHaveLength(0);
+
+    await host.close();
+  });
+
 });

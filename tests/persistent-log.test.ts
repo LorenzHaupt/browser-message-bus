@@ -77,6 +77,34 @@ describe("persistent log extension", () => {
     await bus.close();
   });
 
+  it("logs targeted messages only on bus instances that are actual recipients", async () => {
+    const channel = uniqueChannel();
+    const senderStore = new MemoryLogStore();
+    const targetStore = new MemoryLogStore();
+    const observerStore = new MemoryLogStore();
+
+    const sender = createMessageBus<Messages>({ channel, instanceId: "sender" });
+    const target = createMessageBus<Messages>({ channel, instanceId: "target" });
+    const observer = createMessageBus<Messages>({ channel, instanceId: "observer" });
+
+    const senderLog = sender.use(createPersistentLogExtension({}, () => senderStore));
+    const targetLog = target.use(createPersistentLogExtension({}, () => targetStore));
+    const observerLog = observer.use(createPersistentLogExtension({}, () => observerStore));
+
+    sender.publish("document.open", { id: "4711" }, {
+      target: { instanceId: target.instanceId }
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    await Promise.all([senderLog.flush(), targetLog.flush(), observerLog.flush()]);
+
+    expect(await senderLog.read()).toEqual([]);
+    expect(await observerLog.read()).toEqual([]);
+    expect(await targetLog.read()).toHaveLength(1);
+
+    await Promise.all([sender.close(), target.close(), observer.close()]);
+  });
+
   it("fails explicitly when IndexedDB is unavailable", async () => {
     const bus = createMessageBus<Messages>({
       channel: uniqueChannel(),
