@@ -205,6 +205,8 @@ await bus.connect(
 
 `window.postMessage()` wird nur für den Handshake verwendet. Danach läuft der normale Nachrichtenaustausch über einen dedizierten `MessagePort`.
 
+Bei `iframeBridge()` beobachtet der Host zusätzlich das konkrete iframe-Element. Wird es aus dem DOM entfernt, wird die zugehörige Connection beendet und `connection.closed` zuverlässig erfüllt. Dafür ist weder Polling noch ein Heartbeat nötig. Unerwartete Browser- oder Prozessabbrüche außerhalb dieses kontrollierbaren iframe-Lifecycles bleiben wie bei Browser-Messaging generell Best-Effort.
+
 Eine Bridge kann zusätzlich eingeschränkt werden:
 
 ```ts

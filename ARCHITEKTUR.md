@@ -271,7 +271,7 @@ Fehler, die einen synchronen API-Aufruf grundsätzlich unmöglich machen – zum
 
 Eine bereits geschlossene Instanz akzeptiert keine neuen Publish-, Subscribe-, Use- oder Connect-Aufrufe mehr.
 
-Eine `BusConnection` stellt neben `connected` ein `closed`-Promise bereit. Es wird erfüllt, wenn die Verbindung lokal geschlossen wird oder der entfernte `MessagePort` entkoppelt wird. Dadurch kann eine Anwendung beispielsweise auf das Schließen oder Navigieren eines Viewer-Fensters reagieren.
+Eine `BusConnection` stellt neben `connected` ein `closed`-Promise bereit. Es wird erfüllt, wenn die Verbindung lokal oder von der Gegenseite geschlossen wird. `iframeBridge()` beobachtet zusätzlich das konkrete iframe-Element: Wird es aus dem DOM entfernt, beendet der Host die Connection deterministisch. Native `MessagePort`-Close-Signale bleiben eine zusätzliche Best-Effort-Erkennung für andere Abbruchfälle.
 
 Ein automatisches Reconnect gehört bewusst nicht in den Core. Die Anwendung entscheidet selbst, ob und wann eine neue Verbindung sinnvoll ist. Damit bleibt der Lifecycle beobachtbar, ohne einen zusätzlichen Heartbeat- oder Reconnect-Mechanismus in die Bibliothek einzubauen.
 
